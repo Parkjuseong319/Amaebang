@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    /* CSS 스타일 추가 */
+    /* .list-group-scroll {
+      max-height: 35vh;
+      overflow-y: scroll;
+    } */
+  </style>
+</head>
+<body>
+  <div class="container list-group-scroll" id="propertyList">
+    <!-- 여기에 매물 리스트가 동적으로 생성됩니다 -->
+  </div>
+
+  <script>
+    (function() { // 이 부분을 추가하여 코드를 즉시실행 함수로 감싸줍니다.
+      // 예제 JSON 데이터
+      const jsonData = [
+        {"title": "매물1", "price": "3 억", "content": "내용1", "smallContent": "소내용1"},
+        {"title": "매물2", "price": "3 억", "content": "내용2", "smallContent": "소내용2"},
+        {"title": "매물3", "price": "3 억", "content": "내용3", "smallContent": "소내용3"},
+        {"title": "매물4", "price": "3 억", "content": "내용4", "smallContent": "소내용4"},
+        {"title": "매물5", "price": "3 억", "content": "내용5", "smallContent": "소내용5"},
+      ];
+
+      function generateListItems() {
+        let listItemsHTML = '';
+
+        // JSON 데이터를 반복하면서 HTML 생성
+        jsonData.forEach(item => {
+          listItemsHTML += `
+            <a href="#" class="list-group-item list-group-item-action">
+              <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">${item.title}</h5>
+                <small class="text-body-secondary">${item.price}</small>
+              </div>
+              <p class="mb-1">${item.content}</p>
+              <small class="text-body-secondary">${item.smallContent}</small>
+            </a>
+          `;
+        });
+
+        // 생성된 HTML을 웹 페이지에 추가
+        document.getElementById('propertyList').innerHTML = listItemsHTML;
+      }
+
+      generateListItems(); // 함수 실행
+    })(); // 이 부분을 추가하여 코드를 즉시실행 함수로 감싸줍니다.
+  </script>
+</body>
+</html>

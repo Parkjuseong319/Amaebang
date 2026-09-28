@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Page</title>
+  <link rel="stylesheet" type="text/css" href="./static/css/front-page.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="./static/js/debounce.js"></script>
+  <script src="./static/js/dong.js"></script>
+  <script>
+    function loadNewPage() {
+      const data = {
+        gu: $('#gu').val(),
+        dong: $('#dong').val(),
+        width: $('#width').val(),
+      };
+
+      $.ajax({ // 예상 가격
+        url: "{% url 'predict' %}",
+        method: "GET",
+        data: data,
+        success: function(response) {
+          // console.log(response)
+          // 요청이 성공하면 응답을 갖는 response 객체를 받음
+          // 첨부된 코드와 호환되도록 응답 데이터에서 예상가격 추출, 예상할 경우 변환 필요
+          // const predictedPrice = JSON.stringify(response);
+
+          // 예상가격 출력
+          $('#predict_price').html(response.mean_price);
+        },
+      });
+
+      $.ajax({ // 추천 매물
+        url: "{% url 'recommand' %}", // 추천 매물을 가져올 URL
+        method: "GET",
+        data: data, // 조회 조건 데이터
+        success: function(response) {
+          if (response.length > 0){
+            reset_marker()
+            create_marker(response)
+            setBounds(response)
+            renderRecommendedProperties(response);
+          }
+        },
+        error: function(response){renderRecommendedProperties(propertie)}, 
+    });
+
+      $.ajax({ // 통계 정보
+        url: "{% url 'chart' %}",
+        method: "GET",
+        data: data,
+        success: function (response) {
+          $("#chart").html(response);
+          // initializeCharts(); // 통계 차트 초기화 함수 호출
+        },
+      });
+    }
+
+    // 추천 매물 리스트 출력
+    function renderRecommendedProperties(properties) {
+      let listItemsHTML = '';
+      console.log(properties.length)
+      if (properties.length === 0){
+        listItemsHTML = '<div class="text-center subtitle">조건에 맞는 매물이 없습니다.</div>'
+        document.querySelector('#recom_list').innerHTML = listItemsHTML;
+        resetUsingAjax()
+      } else {
+        properties.forEach(property => {
+            // 가격 문자열 수정
+            let formattedPrice = property.price;
+            let lastChar = formattedPrice.slice(-1);
+            if (lastChar === "억") {
+              formattedPrice += "원";
+            } else if (lastChar === "0") {
+              formattedPrice += "만원";
+            }
+            listItemsHTML += `
+                <a href="#" class="list-group-item list-group-item-action" onclick="convenient(${property.lat}, ${property.lng})">
+                    <div class="d-flex w-100 justify-content-between">
+                      <p class="mb-1 maintitle">${property.title}</p>
+                      <small class="text-body-secondary h4">${formattedPrice}</small>
+                    </div>
+                    <div class='d-flex'>
+                      <span class="mb-1 h6">${property.desc}</span><span class='ms-auto maintitle'>${property.spec}평</span>
+                    </div>
+                </a><hr>
+            `;
+        });
+        document.querySelector('#recom_list').innerHTML = listItemsHTML;
+      }
+    }
+
+    // 조회 버튼 클릭시 loadNewPage 함수 실행
+    $("#submitButton").click(loadNewPage);
+
+    // 편의시설 마커 찍기
+    function convenient(lat, lng){
+      console.log(lat, lng)
+      var select = {};
+      var select1 = ""
+      var select2 = ""
+      var select3 = ""
+      if ($("#flexCheckDefault1").is(':checked')) {
+        select1 = $("#flexCheckDefault1").val();
+      }
+      if ($("#flexCheckDefault3").is(':checked')) {
+        select2 = $("#flexCheckDefault3").val();
+      }
+      if ($("#flexCheckDefault4").is(':checked')) {
+        select3 = $("#flexCheckDefault4").val();
+      }
+      $.ajax({
+        url: 'convenient',
+        type: 'GET',
+        data: { 
+          'lat': lat,
+          'lng': lng,
+          'health': select1,
+          'mart': select2,
+          'starbucks': select3,
+          },
+        dataType : 'json',
+        success: function(response) {
+          // 체크박스에 따라 편의시설 좌표와 정보 생성되게 할 것.
+          if (response.length > 0){
+            reset_marker()
+            move(response)
+            
+            create_convenient_marker(response)
+            closeOverlay()
+            make_overlay2(response[13].name, response[13].addr,response[13].price, response[13].spec, response[0][0], response[0][1])
+            
+          }
+        },
+        error: function(){
+          alert('Error occurred while fetching data from the server');
+          console.log(lat, lng)
+        }
+      });
+
+    }
+
+
+    // 조건 선택 사항 초기화
+    function resetUsingAjax() {
+      const submitButton = document.getElementById('submitButton');
+      $.ajax({
+        url: 'resetFormData', 
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+          submitButton.disabled = true;
+          // 가격 예측 부분 초기화
+          $('#gu').val(data.initialGuValue);
+          $('#dong').html(data.initialDongOptions);
+          $('#width').val(data.initialWidthValue);
+          $('#predict_price').html(data.initialPredictPrice);
+
+          // 편의시설 선택상자 초기화
+          $("#flexCheckDefault1").prop("checked", false);
+          $("#flexCheckDefault2").prop("checked", false);
+          $("#flexCheckDefault3").prop("checked", false);
+          $("#flexCheckDefault4").prop("checked", false);
+
+          // 기존 찍힌 마커 삭제
+          reset_marker()
+        },
+        error: function(){
+            alert('Error occurred while fetching data from the server');
+        }
+      });
+    }
+  </script>
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <div class="container-fluid section" id="price-section">
+    <div class="container">
+      <div class="row bordered-box mt-2 mb-2 py-1 text-center">
+        <div class="col-sm-3 pl-1">
+          <select id="gu" name="gu" class="form-select border-0 subtitle" aria-label="Default select example">
+            <option value="">구명</option>
+            <option value="강남">강남구</option>
+            <option value="강북">강북구</option>
+            <option value="강서">강서구</option>
+            <option value="관악">관악구</option>
+            <option value="광진">광진구</option>
+            <option value="구로">구로구</option>
+            <option value="금천">금천구</option>
+            <option value="노원">노원구</option>
+            <option value="도봉">도봉구</option>
+            <option value="동대문">동대문구</option>
+            <option value="동작">동작구</option>
+            <option value="마포">마포구</option>
+            <option value="서대문">서대문구</option>
+            <option value="서초">서초구</option>
+            <option value="성동">성동구</option>
+            <option value="성북">성북구</option>
+            <option value="송파">송파구</option>
+            <option value="양천">양천구</option>
+            <option value="영등포">영등포구</option>
+            <option value="용산">용산구</option>
+            <option value="은평">은평구</option>
+            <option value="종로">종로구</option>
+            <option value="중">중구</option>
+            <option value="중랑">중랑구</option>
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <select id="dong" name="dong" class="form-select border-0 subtitle" aria-label="Default select example">
+            <!-- /static/js/dong.js -->
+          </select>
+        </div>
+        <div class="col-sm-2 d-flex align-items-center">
+          <div class="d-grid my-auto">
+            <input id="width" name="width" type="number" value="6" min="6" max="90" step="1" class="form-control-plaintext subtitle" style="width: 10mm;">
+          </div>
+          <div class="text-center ms-2 my-auto subtitle">평</div>
+        </div>
+        <div class="col-sm-4 text-end">
+          <button type="button" class="btn btn-light px-2" id="submitButton" disabled>예상가격 조회</button>
+        </div>
+      </div>
+    </div>
+    <div class="bordered-box mt-2 mb-2 py-0 text-center">
+      <div class="text-end subtitle1">편의시설</div>
+      <div class="checkbox-container mt-2">
+        <div class="col">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="health" id="flexCheckDefault1">
+            <label class="form-check-label subtitle" for="flexCheckDefault1">
+              헬스장
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="mart" id="flexCheckDefault3">
+            <label class="form-check-label subtitle" for="flexCheckDefault3">
+              &nbsp;&nbsp;백화점 ・ 대형마트
+            </label>
+          </div>
+        </div>
+        <div class="col">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="starbucks" id="flexCheckDefault4">
+            <label class="form-check-label subtitle" for="flexCheckDefault4">
+              스타벅스
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- <form action="loadNewPage()" method="POST">  {% csrf_token %} -->
+      
+        <!-- </form> -->
+        <!-- 조건에 따른 예상가격 출력 -->
+        <div class="row">
+          <div class="col text-center maintitle">내가 원하는 조건의 매물가격은?</div>
+        </div>
+    <div class="row">
+      <div id="predict_price" class="col-6 text-end h3 my-auto"><!-- 예상가격 출력 부분 --></div>
+      <div class="col-2 my-auto"><h4 class="mt-2 h3">만 원</h4></div>
+      <div class="col-4 my-auto">
+        <button class="btn btn-light" onclick="resetUsingAjax()">초기화</button>
+      </div>
+		</div>
+	</div>
+  <hr>
+  <!-- 조건에 맞는 매물 출력 -->
+    <div class="container"><p class="h3">매물 추천</p></div>
+    <div class="container-fluid section" id="recommend-section">
+      <div id='recom_list'>
+        <!-- list-page.html -->
+        <div class="text-center subtitle">원하는 조건을 선택해주세요</div>
+      </div>
+    </div>
+  </div>
+  <hr>
+  <!-- 해당 지역의 통계 정보 출력 -->
+  <div class="container"><p class="h3">통계 정보</p></div>
+  <div class="container-fluid section" id="chart-section">
+    <div id="chart"><!-- 통계 출력 부분 -->
+      <div class="text-center subtitle">원하는 조건을 선택해주세요</div>
+    </div>
+  </div>
+</body>
+</html>

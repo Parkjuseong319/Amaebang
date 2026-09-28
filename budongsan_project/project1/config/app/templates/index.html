@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+    {% load static %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=5bb8707e9615da06d1261febae8557ca"></script>
+    <style>
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            width: 35%;
+            height:  95%;
+            background-color: white;
+            overflow-y: scroll;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        /* .overlay * {
+            font-size: inherit;
+        } */
+        .map-container {
+            position: absolute;
+            z-index: 0;
+            width: 100%;
+            height: 100vh;
+        }
+        body {
+            overflow: hidden;
+        }
+        .radius_border{border:1px solid #919191;border-radius:5px;} 
+        .custom_zoomcontrol {position:absolute;top:50px;right:10px;width:36px;height:80px;overflow:hidden;z-index:1;background-color:#f5f5f5;} 
+        .custom_zoomcontrol span {display:block;width:36px;height:40px;text-align:center;cursor:pointer;}     
+        .custom_zoomcontrol span img {width:15px;height:15px;padding:12px 0;border:none;}             
+        .custom_zoomcontrol span:first-child{border-bottom:1px solid #bfbfbf;}
+    </style>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        function loadNewPage() {
+        $.ajax({
+            url: "{% url 'front' %}",
+            method: "GET",
+            success: function(response) {
+                $('.overlay').html(response);
+            }
+            });
+        }
+
+        $(document).ready(loadNewPage);
+    </script>
+</head>
+<body>
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=5bb8707e9615da06d1261febae8557ca"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 최하층 지도 api -->
+    <div class="map-container">
+        <div id="map" style="width: 100%; height: 100%;"></div>
+    </div>
+    <div class="custom_zoomcontrol radius_border"> 
+        <span onclick="zoomIn()"><!-- <img src="/static/images/ico_plus.png" alt="확대">--> <h3>+</h3></span>  
+        <span onclick="zoomOut()"><!--<img src="/static/images/ico_minus.png" alt="축소">--><h3>-</h3></span>
+    </div>
+    <!-- 좌측 메인 페이지 -->
+    <div class='overlay'>
+    </div>
+    <script>
+        var mapContainer = document.getElementById('map'), // 지도를 표시할 div 
+            mapOption = {
+                center: new kakao.maps.LatLng(37.56629, 126.97176), // 지도의 중심좌표
+                level: 4, // 지도의 확대 레벨
+                mapTypeId : kakao.maps.MapTypeId.ROADMAP // 지도종류
+            }; 
+    
+            
+            // 지도를 표시하는 div 크기를 변경하는 함수입니다
+            function resizeMap() {
+                var mapContainer = document.getElementById('map');
+                mapContainer.style.width = '100%';
+                mapContainer.style.height = '100vh'; 
+            }
+        // 지도를 생성한다 
+        var map = new kakao.maps.Map(mapContainer, mapOption); 
+
+        function relayout() {
+            // 지도를 표시하는 div 크기를 변경한 이후 지도가 정상적으로 표출되지 않을 수도 있습니다
+            // 크기를 변경한 이후에는 반드시  map.relayout 함수를 호출해야 합니다 
+            // window의 resize 이벤트에 의한 크기변경은 map.relayout 함수가 자동으로 호출됩니다
+            map.relayout();
+        }
+        
+        // 지도를 재설정할 범위정보를 가지고 있을 LatLngBounds 객체를 생성합니다
+        var bounds = new kakao.maps.LatLngBounds();  
+
+        var markers = [],       // 매물
+        hmarkers = [],          // 체육시설
+        mmarkers = [],          // 백화점 대형마트
+        smarkers = []           // 스타벅스
+        
+        var custom_overlay;
+
+        function reset_marker(){
+            // 이전 생성된 마커 제거
+            markers.forEach(mark => mark.setMap(null))
+            markers = []
+            hmarkers.forEach(mark => mark.setMap(null))
+            hmarkers = []
+            smarkers.forEach(mark => mark.setMap(null))
+            smarkers = []
+            mmarkers.forEach(mark => mark.setMap(null))
+            mmarkers = []
+
+                     
+        }
+
+        var imageSrc = '/static/images/home_marker.png', // 마커이미지의 주소입니다    
+        imageSize = new kakao.maps.Size(60, 60), // 마커이미지의 크기입니다
+        imageOption = {offset: new kakao.maps.Point(27, 69)}; // 마커이미지의 옵션입니다. 마커의 좌표와 일치시킬 이미지 안에서의 좌표를 설정합니다.
+        var markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption)
+
+        // 매물 마커 생성 함수
+        function create_marker(mkinfo){
+            //console.log(mkinfo[1].lat, mkinfo[1].lng)
+            // 지도에 마커를 생성하고 표시한다
+            for (let i = 0; i < mkinfo.length; i++) {
+                // 마커를 생성합니다
+                var marker = new kakao.maps.Marker({
+                    map: map, // 마커를 표시할 지도
+                    position:  new kakao.maps.LatLng(mkinfo[i].lat ,mkinfo[i].lng ), // 마커를 표시할 위치
+                    image: markerImage // 마커이미지 설정 
+                });
+                markers.push(marker)
+
+                // 선택 매물 overlay 띄우기
+                kakao.maps.event.addListener(markers[i], 'click', function(){
+                    closeOverlay()
+                    make_overlay2(mkinfo[i].title, mkinfo[i].location, mkinfo[i].price, mkinfo[i].spec, mkinfo[i].lat, mkinfo[i].lng)
+                });
+
+                // LatLngBounds 객체에 좌표를 추가합니다
+                bounds.extend(markers[i].getPosition());
+            }
+            zoomIn()    
+        }    
+        
+
+        // 편의시설 마커 생성 함수
+        function create_convenient_marker(mkinfo){
+            // 사용자가 누른 매물의 좌표 찍기
+            var marker = new kakao.maps.Marker({
+                map: map, // 마커를 표시할 지도
+                position:  new kakao.maps.LatLng(mkinfo[0][0] ,mkinfo[0][1] ), // 마커를 표시할 위치
+                image: markerImage, // 마커이미지 설정 
+                clickable: true
+            });
+            markers.push(marker)
+
+            // 선택 매물 overlay 띄우기
+            kakao.maps.event.addListener(markers[0], 'click', function(){
+                closeOverlay()
+                make_overlay2(mkinfo[13].name, mkinfo[13].addr,mkinfo[13].price, mkinfo[13].spec, mkinfo[0][0], mkinfo[0][1])
+            });
+
+
+            for (let i = 0; i < mkinfo.length; i++) {
+            // 헬스장
+            if ($("#flexCheckDefault1").is(':checked')) {
+                let imageSrc = '/static/images/health_marker2.png', // 마커이미지의 주소입니다    
+                imageSize = new kakao.maps.Size(45, 45), // 마커이미지의 크기입니다
+                imageOption = {offset: new kakao.maps.Point(27, 69)}; // 마커이미지의 옵션입니다. 마커의 좌표와 일치시킬 이미지 안에서의 좌표를 설정합니다.
+                let markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption)
+
+                var hmarker = new kakao.maps.Marker({
+                    map: map, // 마커를 표시할 지도
+                    position:  new kakao.maps.LatLng(mkinfo[3][i] ,mkinfo[4][i]), // 마커를 표시할 위치
+                    // 여기서 헬스장 마커 이미지 넣어줄 것
+                    image: markerImage, // 마커이미지 설정 
+                    clickable: true
+                });
+                
+                hmarkers.push(hmarker)
+                
+                // 마커를 클릭했을 때 커스텀 오버레이를 표시합니다
+                kakao.maps.event.addListener(hmarkers[i], 'click', function(){
+                    closeOverlay()
+                    make_overlay(mkinfo[1][i], mkinfo[2][i], mkinfo[3][i], mkinfo[4][i])
+                });
+
+                // LatLngBounds 객체에 좌표를 추가합니다
+                bounds.extend(hmarkers[i].getPosition())
+                
+            }
+
+            // 마트
+            if ($("#flexCheckDefault3").is(':checked')) {
+                let imageSrc = '/static/images/mart_marker2.png', // 마커이미지의 주소입니다    
+                imageSize = new kakao.maps.Size(45, 45), // 마커이미지의 크기입니다
+                imageOption = {offset: new kakao.maps.Point(27, 69)}; // 마커이미지의 옵션입니다. 마커의 좌표와 일치시킬 이미지 안에서의 좌표를 설정합니다.
+                let markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption)
+
+                var mmarker = new kakao.maps.Marker({
+                    map: map, // 마커를 표시할 지도
+                    position:  new kakao.maps.LatLng(mkinfo[7][i] ,mkinfo[8][i]), // 마커를 표시할 위치
+                    // 여기서 마트 마커 이미지 넣어줄 것
+                    image: markerImage, // 마커이미지 설정 
+                    clickable: true
+                    
+                });
+                mmarkers.push(mmarker)
+
+                // 마커를 클릭했을 때 커스텀 오버레이를 표시합니다
+                kakao.maps.event.addListener(mmarkers[i], 'click', function(){
+                    closeOverlay()
+                    make_overlay(mkinfo[5][i], mkinfo[6][i], mkinfo[7][i], mkinfo[8][i])
+                });
+
+                // LatLngBounds 객체에 좌표를 추가합니다
+                bounds.extend(mmarkers[i].getPosition())
+            
+            }
+
+            // 스타벅스
+            if ($("#flexCheckDefault4").is(':checked')) {
+                let imageSrc = '/static/images/cafe_marker2.png', // 마커이미지의 주소입니다    
+                imageSize = new kakao.maps.Size(45, 45), // 마커이미지의 크기입니다
+                imageOption = {offset: new kakao.maps.Point(27, 69)}; // 마커이미지의 옵션입니다. 마커의 좌표와 일치시킬 이미지 안에서의 좌표를 설정합니다.
+                let markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption)
+                
+                var smarker = new kakao.maps.Marker({
+                    map: map, // 마커를 표시할 지도
+                    position:  new kakao.maps.LatLng(mkinfo[11][i] ,mkinfo[12][i]), // 마커를 표시할 위치
+                    // 여기서 카페 마커 이미지 넣어줄 것
+                    image: markerImage, // 마커이미지 설정 
+                    clickable: true
+                });
+                smarkers.push(smarker)
+
+                // 마커를 클릭했을 때 커스텀 오버레이를 표시합니다
+                kakao.maps.event.addListener(smarkers[i], 'click', function(){
+                    closeOverlay()
+                    make_overlay(mkinfo[9][i], mkinfo[10][i], mkinfo[11][i], mkinfo[12][i])
+                });
+
+                // LatLngBounds 객체에 좌표를 추가합니다
+                bounds.extend(smarkers[i].getPosition())
+                
+            }
+        }
+        
+        }    
+
+        var custom_overlay;
+        
+        var overlays = [];
+        function make_overlay(name, addr, lat, lng){
+            // 마커 위에 커스텀오버레이를 표시합니다
+            // 마커를 중심으로 커스텀 오버레이를 표시하기위해 CSS를 이용해 위치를 설정했습니다
+            custom_overlay = new kakao.maps.CustomOverlay({
+                map: map,
+                position: new kakao.maps.LatLng(lat, lng) ,
+                clickable: true   
+            });
+            
+            // 일반 string type으로 content 생성할 경우 click 이벤트 처리가 되지 않음. 
+            var content = document.createElement('div');
+            content.style.cssText = 'background: white; position: absolute;left: 0;bottom: 40px;width: 286px;height: 80px;margin-left: -144px;text-align: left;overflow: hidden;font-size: 12px;font-family: "Malgun Gothic", dotum, "돋움", sans-serif;line-height: 1.5;';
+            
+            var title = document.createElement('div')
+            title.innerHTML = name;
+            title.style.cssText = 'padding: 5px 0 0 10px;height: 30px;background: #eee;border-bottom: 1px solid #ddd;font-size: 18px;font-weight: bold;'
+            
+            var info = document.createElement('div'); 
+            info.style.cssText = 'width: 286px;height: 80px;border-radius: 5px;border-bottom: 2px solid #ccc;border-right: 1px solid #ccc;overflow: auto;white-space: nowrap;background: #fff;'
+
+            var body = document.createElement('div');
+            body.style.cssText = 'position: relative;overflow: hidden;'
+
+            var closeBtn = document.createElement('button');
+            closeBtn.onclick = function () {
+                custom_overlay.setMap(null);
+            };
+            closeBtn.style.cssText = "position: absolute;top: 7px;right: 10px;color: #888;width: 20px;height: 20px;background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/overlay_close.png');"
+            
+            var ellipsis = document.createElement('div')
+            ellipsis.appendChild(document.createTextNode(addr));
+            ellipsis.style.cssText = 'text-align:center; overflow: auto;text-overflow: ellipsis;white-space: nowrap;font-size: 13px;'
+
+            // content가 가장 바깥 div 태그
+            content.appendChild(info);
+            info.appendChild(title);
+            title.appendChild(closeBtn);
+            info.appendChild(body);
+            body.appendChild(ellipsis);
+
+            // overlay content 속성에 HTML 삽입
+            custom_overlay.setContent(content);
+            
+            
+            overlays.push(custom_overlay)
+        }
+
+        function make_overlay2(name, addr,price, spec, lat, lng){
+            // 마커 위에 커스텀오버레이를 표시합니다
+            // 마커를 중심으로 커스텀 오버레이를 표시하기위해 CSS를 이용해 위치를 설정했습니다
+            custom_overlay = new kakao.maps.CustomOverlay({
+                map: map,
+                position: new kakao.maps.LatLng(lat, lng) ,
+                clickable: true   
+            });
+            
+            // 일반 string type으로 content 생성할 경우 click 이벤트 처리가 되지 않음. 
+            var content = document.createElement('div');
+            content.style.cssText = 'background: white; position: absolute;left: 0;bottom: 40px;width: 286px;height: 80px;margin-left: -144px;text-align: left;overflow: hidden;font-size: 12px;font-family: "Malgun Gothic", dotum, "돋움", sans-serif;line-height: 1.5;';
+            
+            var title = document.createElement('div')
+            title.innerHTML = name;
+            title.style.cssText = 'padding: 5px 0 0 10px;height: 30px;background: #eee;border-bottom: 1px solid #ddd;font-size: 18px;font-weight: bold;'
+            
+            var info = document.createElement('div'); 
+            info.style.cssText = 'width: 286px;height: 80px;border-radius: 5px;border-bottom: 2px solid #ccc;border-right: 1px solid #ccc;overflow: auto;white-space: nowrap;background: #fff;'
+
+            var body = document.createElement('div');
+            body.style.cssText = 'position: relative;overflow: hidden;'
+
+            var closeBtn = document.createElement('button');
+            closeBtn.onclick = function () {
+                custom_overlay.setMap(null);
+            };
+            closeBtn.style.cssText = "position: absolute;top: 7px;right: 10px;color: #888;width: 20px;height: 20px;background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/overlay_close.png'); cursor:pointer;"
+            
+            var ellipsis = document.createElement('div')
+            ellipsis.innerHTML = addr + '<br/>' + spec + '평' + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b style="text-align:left">'+ price+'</b>' 
+            ellipsis.style.cssText = 'text-align:center; overflow: hidden;text-overflow: ellipsis;white-space: nowrap;font-size: 13px;'
+
+            // content가 가장 바깥 div 태그
+            content.appendChild(info);
+            info.appendChild(title);
+            title.appendChild(closeBtn);
+            info.appendChild(body);
+            body.appendChild(ellipsis);
+
+            // overlay content 속성에 HTML 삽입
+            custom_overlay.setContent(content);
+            
+            
+            overlays.push(custom_overlay)
+        }
+
+
+        function setBounds(mkinfo) {
+            // LatLngBounds 객체에 추가된 좌표들을 기준으로 지도의 범위를 재설정합니다
+            // 이때 지도의 중심좌표와 레벨이 변경될 수 있습니다
+            
+            if (mkinfo.length > 0){
+                map.panTo(new kakao.maps.LatLng(mkinfo[0].lat ,mkinfo[0].lng ));
+                map.setLevel(4)
+            }
+        }   
+
+        // 커스텀 오버레이를 닫기 위해 호출되는 함수입니다 
+        function closeOverlay() {
+            //custom_overlay.setMap(null)
+            overlays.forEach(lay => lay.setMap(null));
+            overlays = [];
+        }
+
+        function move(mkinfo){
+            map.panTo(new kakao.maps.LatLng(mkinfo[0][0] ,mkinfo[0][1]))
+            map.setCenter(new kakao.maps.LatLng(mkinfo[0][0] ,mkinfo[0][1]))
+            zoomIn()
+        }
+
+
+        // 지도 확대, 축소 컨트롤에서 확대 버튼을 누르면 호출되어 지도를 확대하는 함수입니다
+        function zoomIn() {
+            map.setLevel(map.getLevel() - 1);
+        }
+
+        // 지도 확대, 축소 컨트롤에서 축소 버튼을 누르면 호출되어 지도를 확대하는 함수입니다
+        function zoomOut() {
+            map.setLevel(map.getLevel() + 1);
+        }
+        
+    </script>
+</body>
+</html>
