@@ -224,4 +224,8 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# 대용량 데이터
+budongsan_project/project1/config/app/static/csv/*.csv
+budongsan_project/project1/config/app/static/csv/*.h5
+
 # End of https://www.toptal.com/developers/gitignore/api/windows,django,vuejs,visualstudiocode
