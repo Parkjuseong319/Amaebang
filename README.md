@@ -263,6 +263,6 @@ df_data = df[
 
 ### 프로젝트 발표 자료
 
-`docs/project-presentation.pdf`
+`project-presentation.pdf`
 
 당시 프로젝트의 기획 배경, 데이터 수집 및 분석 과정, 모델 비교 결과와 웹 서비스 화면은 발표 자료에서 확인할 수 있습니다.
