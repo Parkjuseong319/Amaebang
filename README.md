@@ -206,7 +206,11 @@ df_data = df[
 
 현재 서비스 화면을 동일한 환경에서 재현하기 어려워, 당시 발표 자료에 포함된 화면과 프로젝트 기록을 중심으로 결과물을 확인할 수 있도록 구성합니다.
 
-<img width="1,06" height="545" alt="Image" src="https://github.com/user-attachments/assets/0c9d5417-99f4-46a5-9fac-fbdb3b481e2e" />
+### - 메인화면
+<img width="1083" height="545" alt="Image" src="https://github.com/user-attachments/assets/0c9d5417-99f4-46a5-9fac-fbdb3b481e2e" />
+
+### - 실행 후 결과 창
+<img width="506" height="587" alt="Image" src="https://github.com/user-attachments/assets/68072b94-9a85-4118-9e9a-a7b78d9bdac2" />
 
 > 이미지는 2023년 발표 자료에서 추출한 화면이며, 현재 실행 중인 서비스의 화면이 아닙니다.
 
